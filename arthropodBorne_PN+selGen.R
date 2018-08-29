@@ -435,7 +435,7 @@ for (i in 1:nloops){
     write.csv(df2,file=paste("ABTestPred",i,".csv",sep="_"))  
     
     h2o.rm(c("gbm_grid4",best_gbm))
-    rm(vals,trainSeqs,testSeqs,valSeqs,oBlast,valBlast,testBlast,allBlast,f1_train,f1_test,f1_val,f1_orphan)
+    rm(vals,oBlast,valBlast,testBlast,allBlast)
 }
 
 accs<-data.frame(accuracy.v,pc.accuracy,lr,sr,md,csr,mr,nt)
