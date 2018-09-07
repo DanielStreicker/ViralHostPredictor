@@ -1,13 +1,16 @@
-# Babayan, Orton & Streicker 
-# Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes 
-# Arthropod-bone transmission prediction from phylogenetic neighborhoods
-# https://www.h2o.ai/products/h2o/ 
+"""
+Babayan, Orton & Streicker
+
+Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
+
+-- Arthropod-bone transmission prediction from phylogenetic neighborhoods
+"""
 
 rm(list=ls())
 setwd("") # Set local working directory where files are located
 
 library(plyr)
-library(h2o)
+library(h2o) # https://www.h2o.ai/products/h2o/
 library(dplyr)
 library(reshape2)
 library(ape)
@@ -42,9 +45,9 @@ write.fasta(vecOrp,names(vecOrp),file.out="vecOrphanDB.fasta", open = "w", nbcha
 rm(f1,f_v)
 
 # Train many models
-set.seed(78910)
+set.seed(78910) # ensure reproducible runs
 s<-.7 # proportion in the training set
-nloops=600
+nloops<-600
 accuracy.v<-c()
 pc.accuracy<-matrix(nrow=nloops,ncol=2)
 test.record<-matrix(nrow=80,ncol=nloops) 

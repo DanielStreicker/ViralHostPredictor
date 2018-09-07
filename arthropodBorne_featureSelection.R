@@ -1,46 +1,57 @@
-# Babayan, Orton & Streicker 
-# Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes 
-# Genomic bias feature selection for arthropod-borne transmission model
-# https://www.h2o.ai/products/h2o/ 
+"""
+
+NOTE: the file appears to be misnamed since there is a model training step...?
+
+Babayan, Orton & Streicker
+
+Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
+
+-- Genomic bias feature selection for arthropod-borne transmission model
+"""
 
 rm(list=ls())
 setwd("") # Set local working directory where files are located
 
 library(plyr)
-library(h2o)
+library(h2o) # https://www.h2o.ai/products/h2o/
 library(dplyr)
 library(reshape2)
 library(matrixStats)
 
-localh20<-h2o.init(nthreads = -1)  # Start a local H2O cluster using nthreads = num available cores
+# Start h2o JVM
+localh20<-h2o.init(nthreads = -1)
 
-# Data
+# Read data from file
 f1<-read.csv("BabayanEtAl_VirusData.csv")
 
-# Feature definition
+# Feature definition:
+
+## Genomic features: select all combinations of dinucleotides, codon pairs, amino-acids, and codons (biases)
 dinucs<-grep("[A|T|G|C|U]p[A|T|G|C|U]",names(f1),value=T)
 cps<-grep(".[A|C|D|E|F|G|H|I|K|L|M|N|P|Q|R|S|T|V|W|X|Y]..[A|T|G|C|U]",names(f1),value=T)
 aa.codon.bias<-grep(".Bias",names(f1),value=T)
 gen.feats<-c(dinucs,cps,aa.codon.bias)
 total.feats<-length(gen.feats)
 
-f1<-f1[,c("Virus.name","Genbank.accession","Reservoir","Viral.group","Vector.borne","Vector",gen.feats)] 
+## Append metadata to feature set
+f1<-f1[,c("Virus.name","Genbank.accession","Reservoir","Viral.group","Vector.borne","Vector",gen.feats)]
 f1$response<-factor(f1$Vector.borne)
 
 # Remove viruses with unknown arthropod-borne status
 f2<-subset(f1,f1$Vector.borne!="?")
 f_v<-droplevels(f2)
 
-# Clean up unneeded files
+# Clean up temporary files
 rm(f1,f2)
 
 # Evaluate patterns over many training sets
-set.seed(78910)
-s<-.7 # Proportion in the training set
-nloops<-50
+set.seed(78910) # ensure reproducible runs
+s<-.7 # proportion in the training set
+nloops<-50 # allow model-training loop to run on 'nloops' different training-test set combinations
 vimps<-matrix(nrow=total.feats-2,ncol=nloops)
 
 for (i in 1:nloops){
+  # Build training set
   trains<-f_v %>% group_by(Vector.borne) %>%
     filter(Genbank.accession %in% sample(unique(Genbank.accession), floor(s*length(unique(Genbank.accession)))))
 
@@ -58,7 +69,7 @@ for (i in 1:nloops){
 
   # Convert response to factor
   train[,y] <- as.factor(train[,y])
-  
+
   # GBM with 5x cross validation of training set, test set is not used
   model <- h2o.gbm(x = x,
                     y = y,
@@ -71,7 +82,7 @@ for (i in 1:nloops){
                     seed = 123,
                     nfolds = 5,
                     keep_cross_validation_predictions=T)
-  
+
   vi <- h2o.varimp(model)
   data2  <- vi[order(vi[,1],decreasing=FALSE),] # order alphabetically
   vimps[,i]<-data2[,4] # "percentage" importance
@@ -88,5 +99,5 @@ vistderr<-visd/sqrt(nloops)
 vimps<-cbind(vimps,vimean,visd,vistderr)
 vimps<- vimps[order(vimps[,nloops+1],decreasing=FALSE),]
 
-# Write to file 
+# Write to file
 write.csv(vimps,file="featureImportance_arthropodBorne.csv",row.names = T)

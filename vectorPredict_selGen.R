@@ -1,13 +1,16 @@
-# Babayan, Orton & Streicker 
-# Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes 
-# Vector host prediction from selected genomic features
-# https://www.h2o.ai/products/h2o/ 
+"""
+Babayan, Orton & Streicker
+
+Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
+
+-- Vector host prediction from selected genomic features
+"""
 
 rm(list=ls())
 setwd("") # Set local working directory where files are located
 
 library(plyr)
-library(h2o)
+library(h2o) # https://www.h2o.ai/products/h2o/
 library(dplyr)
 library(reshape2)
 library(matrixStats)
@@ -78,38 +81,38 @@ for (i in 1:nloops){
   vals<-testval %>% group_by(response) %>%
     filter(Genbank.accession %in% sample(unique(Genbank.accession), floor(.3*length(unique(Genbank.accession)))))
   tests<-subset(testval,!(testval$Genbank.accession %in% vals$Genbank.accession)) # ref numbers in testval set absent from test set
-  
+
   trains<-droplevels(trains)
   tests<-droplevels(tests)
   vals<-droplevels(vals)
 
   ntest<-dim(tests)[1]
   test.record[,i]<-as.character(tests$Genbank.accession)
-  
+
   # Training set
-  set<-c("response",gen.feats) 
-  f1_train<-trains[,c(set)] 
-  
+  set<-c("response",gen.feats)
+  f1_train<-trains[,c(set)]
+
   # Test set
   testID<-tests$Virus.name
-  f1_test<-tests[,c(set)] 
-  
+  f1_test<-tests[,c(set)]
+
   # Optimization set
   valID<-vals$Virus.name
-  f1_val<-vals[,c(set)] 
-  
+  f1_val<-vals[,c(set)]
+
   # Vector orphans
-  set<-c(gen.feats) 
-  f1_orphan<-vecorphans[,c(set)] 
-  
-  # Convert to h2o data frames    
+  set<-c(gen.feats)
+  f1_orphan<-vecorphans[,c(set)]
+
+  # Convert to h2o data frames
   train<-as.h2o(f1_train)
   val<-as.h2o(f1_val)
   test<-as.h2o(f1_test)
   orpvec<-as.h2o(f1_orphan)
 
   rm(f1_test,f1_train,f1_val,f1_orphan)
-  
+
   # Identify the response column
   y <- "response"
 
@@ -120,7 +123,7 @@ for (i in 1:nloops){
   train[,y] <- as.factor(train[,y])
   test[,y] <- as.factor(test[,y])
   val[,y] <- as.factor(val[,y])
-  
+
   # Train and validate a grid of GBMs
   gbm_params <- list(learn_rate = c(.001,seq(0.01, 0.2, .02)),
                      max_depth = seq(6, 15, 1),
@@ -128,27 +131,27 @@ for (i in 1:nloops){
                      col_sample_rate = seq(0.5, 1.0, 0.1),
                      ntrees=c(100,150,200),
                      min_rows=c(5,8,10))
-  
-  search_criteria <- list(strategy = "RandomDiscrete", 
+
+  search_criteria <- list(strategy = "RandomDiscrete",
                         max_models = 500)
 
   gbm_grid4 <- h2o.grid("gbm", x = x, y = y,
                         grid_id = "gbm_grid4",
                         training_frame = train,
-                        validation_frame = val, 
+                        validation_frame = val,
                         seed = 1,
                         hyper_params = gbm_params,
                         search_criteria = search_criteria)
-  
+
   gbm_gridperf <- h2o.getGrid(grid_id = "gbm_grid4",
                               sort_by = "accuracy",
                               decreasing = TRUE)
-  
+
   # Grab the model_id for the top GBM model
   best_gbm_model_id <- gbm_gridperf@model_ids[[1]]
   best_gbm <- h2o.getModel(best_gbm_model_id)
   perf <- h2o.performance(best_gbm, test)
-  
+
   # Record best settings
   lr[i]<-as.numeric(gbm_gridperf@summary_table[1,2]) # learn_rate
   sr[i]<-as.numeric(gbm_gridperf@summary_table[1,6]) # sample_rate
@@ -162,11 +165,11 @@ for (i in 1:nloops){
   nclass<-length(unique(trains$response))
   cm2<-cm1[1:nclass,1:nclass]
   cm<-as.matrix(cm2)
-  
+
   norm_cm<-cm/rowSums(cm)
   accuracy.v[i]=sum(diag(cm))/sum(cm)
   pc.accuracy[i,]<-t(diag(cm)/rowSums(cm))
-  
+
   rownames(norm_cm)<-c("Midge","Mosquito","Sandfly","Tick")
   colnames(norm_cm)<-c("Midge","Mosquito","Sandfly","Tick")
   write.csv(norm_cm,file=paste("h2o_Vector_dinuc.blastn_CM_",i,".csv"))
@@ -175,22 +178,22 @@ for (i in 1:nloops){
   vi <- h2o.varimp(best_gbm)
   data2  <- vi[order(vi[,1],decreasing=FALSE),] # order alphabetically
   vimps[,i]<-data2[,4]
-  
+
   # Orphan predictions
   orp.pred <- h2o.predict(best_gbm, orpvec)
   df<-orp.pred[,c(2:5)]
   df2<-as.data.frame(df)
   row.names(df2)<-vecorphans$Virus.name
   colnames(df2)<-c("Midge","Mosquito","Sandfly","Tick")
-  
-  write.csv(df2,file=paste("VectorOrphans",i,".csv",sep="_"))  
-  
+
+  write.csv(df2,file=paste("VectorOrphans",i,".csv",sep="_"))
+
   # Test set predictions
   test.pred<-h2o.predict(best_gbm,test[,2:length(names(test))]) # REMOVE host COLUMN
   df2<-as.data.frame(test.pred)
   row.names(df2)<-testID
-  write.csv(df2,file=paste("VectorTestPred",i,".csv",sep="_"))  
-  
+  write.csv(df2,file=paste("VectorTestPred",i,".csv",sep="_"))
+
   # Clean up
   h2o.rm("gbm_grid4")
   rm(gbm_grid4,gbm_gridperf,best_gbm,train,val,test,orpvec,test.pred,orp.pred,vi)
