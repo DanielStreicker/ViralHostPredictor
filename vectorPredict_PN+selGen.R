@@ -1,14 +1,17 @@
-# Babayan, Orton & Streicker 
-# Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes 
-# Vector host prediction from selected genomic features and phylogenetic neighborhoods
-# https://www.h2o.ai/products/h2o/ 
+"""
+Babayan, Orton & Streicker
+
+Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
+
+-- Vector host prediction from selected genomic features and phylogenetic neighborhoods
+"""
 
 rm(list=ls())
 setwd("") # Set local working directory where files are located
 
 library(plyr)
-library(h2o)
-library(dplyr) 
+library(h2o) # https://www.h2o.ai/products/h2o/
+library(dplyr)
 library(reshape2)
 library(ape)
 library(seqinr)
@@ -84,7 +87,7 @@ for (i in 1:nloops){
   vals<-testval %>% group_by(response) %>%
     filter(Genbank.accession %in% sample(unique(Genbank.accession), floor(.3*length(unique(Genbank.accession)))))
   tests<-subset(testval,!(testval$Genbank.accession %in% vals$Genbank.accession)) # ref numbers in testval set absent from test set
-  
+
   trains<-droplevels(trains)
   tests<-droplevels(tests)
   vals<-droplevels(vals)
@@ -103,7 +106,7 @@ for (i in 1:nloops){
 
   # BLAST
   system("makeblastdb -in trainDB.fasta -dbtype nucl -parse_seqids -out allTrainingDB",intern=F)
-  
+
   # Blast orphans against training
   system("blastn -db allTrainingDB -query vecorphanDB.fasta -out vecOrphanOut.out -num_threads 10 -outfmt 10 -max_target_seqs=5 -max_hsps 1 -reward 2 -task blastn -evalue 10 -word_size 8 -gapopen 2 -gapextend 2",inter=F, wait=T)
   # Blast validation against training
@@ -112,7 +115,7 @@ for (i in 1:nloops){
   system("blastn -db allTrainingDB -query testDB.fasta -out testOut.out -num_threads 10 -outfmt 10 -max_target_seqs=5 -max_hsps 1 -reward 2 -task blastn -evalue 10 -word_size 8 -gapopen 2 -gapextend 2",inter=F,wait=T)
   # Blast training against the training set (take top 5 hits)
   system("blastn -db allTrainingDB -query trainDB.fasta -out trainOut.out -num_threads 10 -outfmt 10 -max_target_seqs=6 -max_hsps 1 -reward 2 -task blastn -evalue 10 -word_size 8 -gapopen 2 -gapextend 2",inter=F,wait=T)
-  
+
   # Summarize blast hits from training set
   allBlast<-read.csv(file="trainOut.out",col.names = c("query acc.", "subject acc.", "% identity", "alignment length", "mismatches", "gap opens", "q. start", "q. end"," s. start"," s. end"," evalue"," bit score"),header=F)
   nvir<-length(unique(allBlast$query.acc.))
@@ -122,7 +125,7 @@ for (i in 1:nloops){
   d<-subset(allBlast,allBlast$query.acc.==virnames[j])
   d2<-subset(d,d$X..identity<100)
   d2<-subset(d2,d2$X.evalue<ecutoff)
-  
+
   # Assign equal probability across all hosts if there is no good blast hit
   for (z in 1:1){
     if (nrow(d2)==0){
@@ -140,7 +143,7 @@ for (i in 1:nloops){
       hosts<-data.frame(hosts)
       id<-as.character(virnames[j])
       blast.uc<-cbind(id,hosts)}}
-  
+
   for (j in 2:nvir){
     d<-subset(allBlast,allBlast$query.acc.==virnames[j])
     d2<-subset(d,d$X..identity<100)
@@ -162,11 +165,11 @@ for (i in 1:nloops){
       id<-as.character(virnames[j])
       blast.uc.s<-cbind(id,hosts)}
     blast.uc<-rbind(blast.uc,blast.uc.s)}
-  
+
   f1_train<-merge(trains,blast.uc,by.x="Genbank.accession",by.y="id",all.x=F,all.y=T)
-  set<-c("response",gen.feats,bp) 
-  f1_train<-f1_train[,c(set)] 
-  
+  set<-c("response",gen.feats,bp)
+  f1_train<-f1_train[,c(set)]
+
   # Summarize blast hits from test set
   testBlast<-read.csv(file="testOut.out",col.names = c("query acc.", "subject acc.", "% identity", "alignment length", "mismatches", "gap opens", "q. start", "q. end"," s. start"," s. end"," evalue"," bit score"),header=F)
   nvir<-length(unique(testBlast$query.acc.))
@@ -175,7 +178,7 @@ for (i in 1:nloops){
   j=1
   d<-subset(testBlast,testBlast$query.acc.==virnames[j])
   d2<-subset(d,d$X.evalue<ecutoff)
-  
+
   # Assign equal probability across all hosts if there is no good blast hit
   for (z in 1:1){
     if (nrow(d2)==0){
@@ -193,11 +196,11 @@ for (i in 1:nloops){
       hosts<-data.frame(hosts)
       id<-as.character(virnames[j])
       blast.uc<-cbind(id,hosts)}}
-  
+
   for (j in 2:nvir){
     d<-subset(testBlast,testBlast$query.acc.==virnames[j])
     d2<-subset(d,d$X.evalue<ecutoff)
-    
+
     # Assign equal probability across all hosts if there is no good blast hit
     if (nrow(d2)==0){
       blast.uc.s<-rep(1/ntax,ntax)
@@ -215,12 +218,12 @@ for (i in 1:nloops){
       id<-as.character(d$query.acc.[1])
       blast.uc.s<-cbind(id,hosts)}
     blast.uc<-rbind(blast.uc,blast.uc.s)}
-  
+
   f1_test<-merge(tests,blast.uc,by.x="Genbank.accession",by.y="id",all.x=F,all.y=T)
   testID<-f1_test$Virus.name
-  set<-c("response",gen.feats,bp) 
-  f1_test<-f1_test[,c(set)] 
-  
+  set<-c("response",gen.feats,bp)
+  f1_test<-f1_test[,c(set)]
+
   # Optimization set
   valBlast<-read.csv(file="valOut.out",col.names = c("query acc.", "subject acc.", "% identity", "alignment length", "mismatches", "gap opens", "q. start", "q. end"," s. start"," s. end"," evalue"," bit score"),header=F)
   nvir<-length(unique(valBlast$query.acc.))
@@ -229,7 +232,7 @@ for (i in 1:nloops){
   j=1
   d<-subset(valBlast,valBlast$query.acc.==virnames[j])
   d2<-subset(d,d$X.evalue<ecutoff)
-  
+
   # Assign equal probability across all hosts if there is no good blast hit
   for (z in 1:1){
     if (nrow(d2)==0){
@@ -247,7 +250,7 @@ for (i in 1:nloops){
       hosts<-data.frame(hosts)
       id<-as.character(virnames[j])
       blast.uc<-cbind(id,hosts)}}
-  
+
   for (j in 2:nvir){
     d<-subset(valBlast,valBlast$query.acc.==virnames[j])
     d2<-subset(d,d$X.evalue<ecutoff)
@@ -268,12 +271,12 @@ for (i in 1:nloops){
       id<-as.character(d$query.acc.[1])
       blast.uc.s<-cbind(id,hosts)}
     blast.uc<-rbind(blast.uc,blast.uc.s)}
-  
+
   f1_val<-merge(vals,blast.uc,by.x="Genbank.accession",by.y="id",all.x=F,all.y=T)
   valID<-f1_val$Virus.name
   set<-c("response",gen.feats,bp)
-  f1_val<-f1_val[,c(set)] 
-  
+  f1_val<-f1_val[,c(set)]
+
   # Vector orphans
   oBlast<-read.csv(file="vecOrphanOut.out",col.names = c("query acc.", "subject acc.", "% identity", "alignment length", "mismatches", "gap opens", "q. start", "q. end"," s. start"," s. end"," evalue"," bit score"),header=F)
   nvir<-length(unique(oBlast$query.acc.))
@@ -282,7 +285,7 @@ for (i in 1:nloops){
   j=1
   d<-subset(oBlast,oBlast$query.acc.==virnames[j])
   d2<-subset(d,d$X.evalue<ecutoff)
-  
+
   # Assign equal probability across all hosts if there is no good blast hit
   for (z in 1:1){
     if (nrow(d2)==0){
@@ -300,7 +303,7 @@ for (i in 1:nloops){
       hosts<-data.frame(hosts)
       id<-as.character(virnames[j])
       blast.uc<-cbind(id,hosts)}}
-  
+
   for (j in 2:nvir){
     d<-subset(oBlast,oBlast$query.acc.==virnames[j])
     d2<-subset(d,d$X.evalue<ecutoff)
@@ -321,12 +324,12 @@ for (i in 1:nloops){
       id<-as.character(d$query.acc.[1])
       blast.uc.s<-cbind(id,hosts)}
     blast.uc<-rbind(blast.uc,blast.uc.s)}
-  
+
   f1_orphan<-merge(vecorphans,blast.uc,by.x="Genbank.accession",by.y="id",all.x=T,all.y=T,sort=F)
-  set<-c(gen.feats,bp) 
-  f1_orphan<-f1_orphan[,c(set)] 
-  
-  # Convert to h2o data frames    
+  set<-c(gen.feats,bp)
+  f1_orphan<-f1_orphan[,c(set)]
+
+  # Convert to h2o data frames
   train<-as.h2o(f1_train)
   val<-as.h2o(f1_val)
   test<-as.h2o(f1_test)
@@ -334,7 +337,7 @@ for (i in 1:nloops){
 
   # Clean up
   rm(f1_test,f1_train,f1_val,f1_orphan,allBlast,valBlast,testBlast,oBlast,trainSeqs,testSeqs,valSeqs)
-  
+
   # Identity the response column
   y <- "response"
 
@@ -345,7 +348,7 @@ for (i in 1:nloops){
   train[,y] <- as.factor(train[,y])
   test[,y] <- as.factor(test[,y])
   val[,y] <- as.factor(val[,y])
-  
+
   # Train and validate a grid of GBMs
   gbm_params <- list(learn_rate = c(.001,seq(0.01, 0.2, .02)),
                      max_depth = seq(6, 15, 1),
@@ -353,18 +356,18 @@ for (i in 1:nloops){
                      col_sample_rate = seq(0.5, 1.0, 0.1),
                      ntrees=c(100,150,200),
                      min_rows=c(5,8,10))
-  
-  search_criteria <- list(strategy = "RandomDiscrete", 
+
+  search_criteria <- list(strategy = "RandomDiscrete",
                         max_models = 500)
 
   gbm_grid4 <- h2o.grid("gbm", x = x, y = y,
                         grid_id = "gbm_grid4",
                         training_frame = train,
-                        validation_frame = val, 
+                        validation_frame = val,
                         seed = 1,
                         hyper_params = gbm_params,
                         search_criteria = search_criteria)
-  
+
   gbm_gridperf <- h2o.getGrid(grid_id = "gbm_grid4",
                               sort_by = "accuracy",
                               decreasing = TRUE)
@@ -373,10 +376,10 @@ for (i in 1:nloops){
   best_gbm_model_id <- gbm_gridperf@model_ids[[1]]
   best_gbm <- h2o.getModel(best_gbm_model_id)
   perf <- h2o.performance(best_gbm, test)
-  
+
   # Write model (if required)
   #h2o.saveModel(best_gbm,path =paste("vectorPredict_PNSG_model",i))
-  
+
   # Record best settings
   lr[i]<-as.numeric(gbm_gridperf@summary_table[1,2]) # learn_rate
   sr[i]<-as.numeric(gbm_gridperf@summary_table[1,6]) # sample_rate
@@ -390,11 +393,11 @@ for (i in 1:nloops){
   nclass<-length(unique(trains$response))
   cm2<-cm1[1:nclass,1:nclass]
   cm<-as.matrix(cm2)
-  
+
   norm_cm<-cm/rowSums(cm)
   accuracy.v[i]=sum(diag(cm))/sum(cm)
   pc.accuracy[i,]<-t(diag(cm)/rowSums(cm))
-  
+
   rownames(norm_cm)<-c("Midge","Mosquito","Sandfly","Tick")
   colnames(norm_cm)<-c("Midge","Mosquito","Sandfly","Tick")
   write.csv(norm_cm,file=paste("h2o_Vector_dinuc.blastn_CM_",i,".csv"))
@@ -403,23 +406,23 @@ for (i in 1:nloops){
   vi <- h2o.varimp(best_gbm)
   data2  <- vi[order(vi[,1],decreasing=FALSE),] # order alphabetically
   vimps[,i]<-data2[,4]
-  
+
   # Orphan predictions
   orp.pred <- h2o.predict(best_gbm, orpvec)
   df<-orp.pred[,c(2:5)]
   df2<-as.data.frame(df)
   row.names(df2)<-vecorphans$Virus.name
   colnames(df2)<-c("Midge","Mosquito","Sandfly","Tick")
-  
-  write.csv(df2,file=paste("VectorOrphans",i,".csv",sep="_"))  
-  
+
+  write.csv(df2,file=paste("VectorOrphans",i,".csv",sep="_"))
+
   # Test set predictions
   test.pred<-h2o.predict(best_gbm,test[,2:length(names(test))]) # REMOVE host COLUMN
   df2<-as.data.frame(test.pred)
   row.names(df2)<-testID
-  write.csv(df2,file=paste("VectorTestPred",i,".csv",sep="_"))  
-  
-  h2o.rm("gbm_grid4") 
+  write.csv(df2,file=paste("VectorTestPred",i,".csv",sep="_"))
+
+  h2o.rm("gbm_grid4")
   rm(gbm_grid4,gbm_gridperf,best_gbm,train,val,test,orpvec)
 }
 

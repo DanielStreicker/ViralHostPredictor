@@ -1,12 +1,15 @@
-# Babayan, Orton & Streicker 
-# Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes 
-# Genomic bias feature selection for vector taxon model
-# https://www.h2o.ai/products/h2o/ 
+"""
+Babayan, Orton & Streicker
+
+Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
+
+-- Genomic bias feature selection for vector taxon model
+"""
 
 rm(list=ls())
 
 library(plyr)
-library(h2o)
+library(h2o) # https://www.h2o.ai/products/h2o/
 library(dplyr)
 library(reshape2)
 library(matrixStats)
@@ -25,7 +28,7 @@ aa.codon.bias<-grep(".Bias",names(f1),value=T)
 gen.feats<-c(dinucs,cps,aa.codon.bias)
 total.feats<-length(gen.feats)
 
-f1<-f1[,c("Virus.name","Genbank.accession","Reservoir","Viral.group","Vector.borne","Vector",gen.feats)] 
+f1<-f1[,c("Virus.name","Genbank.accession","Reservoir","Viral.group","Vector.borne","Vector",gen.feats)]
 f1$response<-factor(f1$Vector)
 
 # Select viral groups with vectors and remove features with little variation
@@ -56,7 +59,7 @@ s<-.7 # proportion in the training set
 # Evaluate feature importance over 50 training sets (70% each with 5x cross-validation)
 set.seed(78910)
 nloops<-50
-vimps<-matrix(nrow=ngenomic,ncol=nloops) 
+vimps<-matrix(nrow=ngenomic,ncol=nloops)
 
 for (i in 1:nloops){
   mosq_sel<-mosq[sample(1:nrow(mosq),20),] # Downsample mosquito viruses
@@ -66,11 +69,11 @@ for (i in 1:nloops){
     filter(Genbank.accession %in% sample(unique(Genbank.accession), floor(s*length(unique(Genbank.accession)))))
 
   set<-c("Vector",all.gen)
-  f1_train<-trains[,c(set)] 
-  
+  f1_train<-trains[,c(set)]
+
   # Build h2o data frames
   train<-as.h2o(f1_train)
-  
+
   # Identity the response column
   y <- "Vector"
 
@@ -79,7 +82,7 @@ for (i in 1:nloops){
 
   # Convert response to factor
   train[,y] <- as.factor(train[,y])
-  
+
   # GBM with 5x cross validation of training set, test set is not used
   model <- h2o.gbm(x = x,
                     y = y,
@@ -92,14 +95,14 @@ for (i in 1:nloops){
                     seed = 123,
                     nfolds = 5,
                     keep_cross_validation_predictions=F)
-  
+
   # Retreive feature importance
   vi <- h2o.varimp(model)
   data2  <- vi[order(vi[,1],decreasing=FALSE),] # order alphabetically
   vimps[,i]<-data2[,4] # percentage importance
   h2o.rm(model)
   rm(train,f1_train,vi,f_all,trains)
-} 
+}
 
 # Average feature importance across all training sets
 row.names(vimps)<-data2$variable
@@ -109,5 +112,5 @@ vistderr<-visd/sqrt(nloops)
 vimps<-cbind(vimps,vimean,visd,vistderr)
 vimps<- vimps[order(vimps[,nloops+1],decreasing=FALSE),]
 
-# Write to file 
+# Write to file
 write.csv(vimps,file="featureImportance_vector.csv",row.names = T)
