@@ -1,7 +1,5 @@
 """
 
-NOTE: the file appears to be misnamed since there is a model training step...?
-
 Babayan, Orton & Streicker
 
 Predicting Reservoir Hosts and Arthropod Vectors from Evolutionary Signatures in RNA Virus Genomes
