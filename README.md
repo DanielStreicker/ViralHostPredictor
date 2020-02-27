@@ -3,7 +3,7 @@
 _Simon A. Babayan, Richard J. Orton and Daniel G. Streicker_
 
 ## Background
-A series of scripts and datasets described in Babayan _et al._ (2018) _Science_ which predict the reservoir hosts, existence of arthropod vectors and identity of arthropod vectors using gradient boosting machines.
+A series of scripts and datasets described in Babayan _et al._ (2018) Science doi: 10.1126/science.aap9072 which predict the reservoir hosts, existence of arthropod vectors and identity of arthropod vectors using gradient boosting machines.
 
 ## File descriptions
 
